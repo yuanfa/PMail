@@ -1,0 +1,44 @@
+kind: pipeline
+type: docker
+name: default
+steps:
+  - name: scp files
+    image: appleboy/drone-scp
+    settings:
+      host: 192.168.123.208
+      username: admin
+      password: 78667602
+      port: 22
+      target: /var/services/homes/admin/pmail/
+      source: ./*
+  - name: build image to aliyun
+    image: appleboy/drone-ssh
+    settings:
+      host: 192.168.123.208
+      username: admin
+      password: 78667602
+      port: 22
+      command_timeout: 30m
+      script:
+        - cd /var/services/homes/admin/pmail/
+        - export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/syno/sbin:/usr/syno/bin:/usr/local/sbin:/usr/local/bin
+        - echo 78667602 | sudo chmod 777 /var/run/docker.sock
+        - docker login --username=ok@xjiangwei.cn --password=*Enm3sEqfhomy6 registry.cn-hangzhou.aliyuncs.com
+        - docker build --no-cache -t registry.cn-hangzhou.aliyuncs.com/jiangwei_docker_hub/pmail:latest .
+        - docker push registry.cn-hangzhou.aliyuncs.com/jiangwei_docker_hub/pmail:latest
+        - cd .. && rm -rf pmail
+  - name: ssh commands
+    image: appleboy/drone-ssh
+    settings:
+      host: 67.230.188.98
+      username: root
+      password: DHMuJ2zKaYbQ
+      port: 27947
+      command_timeout: 30m
+      script:
+        - cd /root/privateServer/
+        - export PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/syno/sbin:/usr/syno/bin:/usr/local/sbin:/usr/local/bin
+        - docker stop $(docker ps -a | grep "pmail" | awk '{print $1 }')
+        - docker system prune --all --force
+        - docker-compose up --build -d
+        - curl -d "{\"content\":\"PMail部署完成\"}" -X POST "http://wx.jinnrry.com/sendMsg?to_user=oUGSb6Ws2LYGaHkdoH0EzWFnvs5s&content=server_restart_success&key=78667602"
